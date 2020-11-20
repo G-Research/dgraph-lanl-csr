@@ -1,0 +1,105 @@
+<id>: string @index(exact) .
+
+<time>: dateTime @index(hour) .
+<start>: dateTime @index(hour) .
+<end>: dateTime @index(hour) .
+
+#<time>: int @index(int) .
+#<start>: int @index(int) .
+#<end>: int @index(int) .
+<duration>: int @index(int) .
+<occurrences>: int @index(int) .
+
+<user>: uid @reverse .
+<sourceUser>: uid @reverse .
+<destinationUser>: uid @reverse .
+
+<computer>: uid @reverse .
+<sourceComputer>: uid @reverse .
+<destinationComputer>: uid @reverse .
+<resolvedComputer>: uid @reverse .
+
+<login>: string @index(exact) .
+<domain>: string @index(exact) .
+
+<authType>: string @index(exact) .
+<logonType>: string @index(exact) .
+<authOrient>: string @index(exact) .
+<outcome>: string @index(exact) .
+
+<processName>: string @index(exact) .
+<eventType>: string @index(exact) .
+
+<sourcePort>: int @index(int) .
+<destinationPort>: int @index(int) .
+<protocol>: int @index(int) .
+<packets>: int @index(int) .
+<bytes>: int @index(int) .
+
+
+type User {
+  <id>
+  <login>
+  <domain>
+}
+
+type Computer {
+  <id>
+}
+
+type AuthEvent {
+  <sourceUser>
+  <destinationUser>
+  <sourceComputer>
+  <destinationComputer>
+  <authType>
+  <logonType>
+  <authOrient>
+  <outcome>
+  <time>
+  <occurrences>
+}
+type ProcessEvent {
+  <user>
+  <computer>
+  <processName>
+  <eventType>
+  <time>
+  <occurrences>
+}
+type DnsEvent {
+  <sourceComputer>
+  <resolvedComputer>
+  <time>
+  <occurrences>
+}
+type CompromiseEvent {
+  <user>
+  <sourceComputer>
+  <destinationComputer>
+  <time>
+  <occurrences>
+}
+
+type ProcessDuration {
+  <user>
+  <computer>
+  <processName>
+  <start>
+  <end>
+  <duration>
+}
+type FlowDuration {
+  <sourceComputer>
+  <destinationComputer>
+  <sourcePort>
+  <destinationPort>
+  <protocol>
+  <packets>
+  <bytes>
+  <start>
+  <end>
+  <duration>
+  <occurrences>
+}
+
