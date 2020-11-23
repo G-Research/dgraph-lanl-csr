@@ -32,8 +32,8 @@ function join { local IFS="$1"; shift; echo "$*"; }
 # start zero
 echo "starting zero"
 rm -rf /dgraph/zw
-dgraph zero >> /dgraph/zero.log 2>&1 < /dev/null &
-sleep 5
+dgraph zero --enable_sentry=false >> /dgraph/zero.log 2>&1 < /dev/null &
+sleep 10
 
 # start bulk loader
 echo "bulk loading"

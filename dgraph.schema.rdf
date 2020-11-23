@@ -1,12 +1,11 @@
 <id>: string @index(exact) .
 
-<time>: dateTime @index(hour) .
-<start>: dateTime @index(hour) .
-<end>: dateTime @index(hour) .
-
-#<time>: int @index(int) .
-#<start>: int @index(int) .
-#<end>: int @index(int) .
+<time>: int @index(int) .
+<start>: int @index(int) .
+<end>: int @index(int) .
+#<time>: dateTime @index(hour) .
+#<start>: dateTime @index(hour) .
+#<end>: dateTime @index(hour) .
 <duration>: int @index(int) .
 <occurrences>: int @index(int) .
 
