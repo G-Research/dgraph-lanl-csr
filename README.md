@@ -47,7 +47,7 @@ Use appropriate paths accessible to the Spark workers if you run on a Spark clus
 
 Run the Spark application locally on your machine with
 
-    MAVEN_OPTS=-Xmx2g mvtest-compile exec:java -Dexec.classpathScope="test" -Dexec.cleanupDaemonThreads=false \
+    MAVEN_OPTS=-Xmx2g mvn test-compile exec:java -Dexec.classpathScope="test" -Dexec.cleanupDaemonThreads=false \
         -Dexec.mainClass="uk.co.gresearch.dgraph.lanl.csr.RunSparkApp" -Dexec.args="data/ rdf/"
 
 Or via Spark submit on your Spark cluster:
