@@ -3,7 +3,7 @@ package uk.co.gresearch.dgraph.lanl.csr
 import org.apache.spark.sql._
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{IntegerType, StringType}
+import org.apache.spark.sql.types.IntegerType
 import uk.co.gresearch._
 import uk.co.gresearch.dgraph.lanl.csr.Schema.Predicates._
 import uk.co.gresearch.dgraph.lanl.csr.Schema.Types
@@ -18,13 +18,14 @@ case class Red(time: Int, user: String, srcComputer: String, dstComputer: String
 // Entities of the graph (have no time dimension)
 case class User(blankId: Long, id: String, login: Option[String], domain: Option[String])
 case class Computer(blankId: Long, id: String)
+case class ComputerUser(blankId: Long, userId: Long, computerId: Long)
 // Event entities (events have time: Int)
-case class AuthEvent(blankId: Long, srcUserId: Long, dstUserId: Long, srcComputerId: Long, dstComputerId: Long, authType: Option[String], logonType: Option[String], authOrient: Option[String], outcome: Option[String], time: Int, occurrences: Option[Int])
-case class ProcessEvent(blankId: Long, userId: Long, computerId: Long, processName: String, eventType: String, time: Int, occurrences: Option[Int])
+case class AuthEvent(blankId: Long, srcComputerUserId: Long, dstComputerUserId: Long, authType: Option[String], logonType: Option[String], authOrient: Option[String], outcome: Option[String], time: Int, occurrences: Option[Int])
+case class ProcessEvent(blankId: Long, computerUserId: Long, processName: String, eventType: String, time: Int, occurrences: Option[Int])
 case class DnsEvent(blankId: Long, srcComputerId: Long, resolvedComputerId: Long, time: Int, occurrences: Option[Int])
-case class CompromiseEvent(blankId: Long, userId: Long, srcComputerId: Long, dstComputerId: Long, time: Int, occurrences: Option[Int])
+case class CompromiseEvent(blankId: Long, computerUserId: Long, dstComputerId: Long, time: Int, occurrences: Option[Int])
 // Duration entities (durations have Int start, end, duration)
-case class ProcessDuration(blankId: Long, userId: Long, computerId: Long, processName: String, start: Option[Int], end: Option[Int], duration: Option[Int])
+case class ProcessDuration(blankId: Long, computerUserId: Long, processName: String, start: Option[Int], end: Option[Int], duration: Option[Int])
 case class FlowDuration(blankId: Long, srcComputerId: Long, dstComputerId: Long, srcPort: Option[Int], dstPort: Option[Int], protocol: Option[String], packets: Option[Int], bytes: Option[Long], start: Int, end: Int, duration: Int, occurrences: Option[Int])
 
 // Triple for written to RDF files
@@ -118,21 +119,35 @@ object CsrDgraphSparkApp {
       println(f"Row counts: auth=$authCount%,d proc=$procCount%,d flow=$flowCount%,d dns=$dnsCount%,d red=$redCount%,d " +
         f"all=${authCount+procCount+flowCount+dnsCount+redCount}%,d")
 
-      println(s"Duplicate rows: " +
-        f"auth=${countDuplicates(auth)}%,d " +
-        f"proc=${countDuplicates(proc)}%,d " +
-        f"flow=${countDuplicates(flow)}%,d " +
-        f"dns=${countDuplicates(dns)}%,d " +
-        f"red=${countDuplicates(red)}%,d")
-
       val procWithUnexpectedType = proc.where(!$"eventType".isin("Start", "End")).count
       println(s"Rows with Proc.eventType other than 'Start' and 'End': " +
         f"$procWithUnexpectedType%,d (${(procWithUnexpectedType * 1000 / procCount) / 10.0}%%)")
+
+      Seq(auth, proc, flow, dns, red).map(countDuplicates(_)) match {
+        case Seq(authDuplicates, procDuplicates, flowDuplicates, dnsDuplicates, redDuplicates) =>
+          println(s"Duplicate rows: " +
+            f"auth=$authDuplicates%,d " +
+            f"proc=$procDuplicates%,d " +
+            f"flow=$flowDuplicates%,d " +
+            f"dns=$dnsDuplicates%,d " +
+            f"red=$redDuplicates%,d")
+
+          if (authDuplicates > 0 && !deduplicateAuth) println("Warning: There are duplicate rows in auth, but deduplicateAuth is set false!")
+          if (procDuplicates > 0 && !deduplicateProc) println("Warning: There are duplicate rows in proc, but deduplicateProc is set false!")
+          if (flowDuplicates > 0 && !deduplicateFlow) println("Warning: There are duplicate rows in flow, but deduplicateFlow is set false!")
+          if (dnsDuplicates > 0 && !deduplicateDns) println("Warning: There are duplicate rows in dns, but deduplicateDns is set false!")
+          if (redDuplicates > 0 && !deduplicateRed) println("Warning: There are duplicate rows in red, but deduplicateRed is set false!")
+
+          if (authDuplicates == 0 && deduplicateAuth) println("Warning: There are no duplicate rows in auth, so it is not required to set deduplicateAuth true!")
+          if (procDuplicates == 0 && deduplicateProc) println("Warning: There are no duplicate rows in proc, so it is not required to set deduplicateProc true!")
+          if (flowDuplicates == 0 && deduplicateFlow) println("Warning: There are no duplicate rows in flow, so it is not required to set deduplicateFlow is set true!")
+          if (dnsDuplicates == 0 && deduplicateDns) println("Warning: There are no duplicate rows in dns, so it is not required to set deduplicateDns true!")
+          if (redDuplicates == 0 && deduplicateRed) println("Warning: There are no duplicate rows in red, so it is not required to set deduplicateRed true!")
+      }
+      println()
     }
 
-    // TODO: filter out rows breaking assumptions
-
-    val (userMapping, computerMapping) = {
+    val (userMapping, computerMapping, computerUserMapping) = {
       // generate all occurring users
       val users = Seq(
         auth.select(explode(array($"srcUser", $"dstUser")).as("id")),
@@ -142,7 +157,7 @@ object CsrDgraphSparkApp {
         .reduce(_.unionByName(_))
         .distinct()
         .call(addLoginAndDomain(_, $"id"))
-        .call(addBlankId)
+        .call(addBlankId())
         .as[User]
         .cache()
 
@@ -156,7 +171,7 @@ object CsrDgraphSparkApp {
       )
         .reduce(_.unionByName(_))
         .distinct()
-        .call(addBlankId)
+        .call(addBlankId())
         .as[Computer]
         .cache()
 
@@ -183,24 +198,51 @@ object CsrDgraphSparkApp {
         }
       .call(writeRdf(s"$outputPath/computers.rdf", compressRdf))
 
-      // derive user and computer mappings and uncache unused datasets
+      // derive user and computer mappings
       val userMapping = users.select($"id", $"blankId").as[(String, Long)].cache
-      userMapping.count()  // materialize user mapping
-      users.unpersist()    // unpersist users dataset
       val computerMapping = computers.select($"id", $"blankId").as[(String, Long)].cache
-      computerMapping.count()  // materialize computer  mapping
-      computers.unpersist()    // unpersist computer dataset
 
-      (userMapping, computerMapping)
+      // generate all computer and user co-occurrences
+      val computerUsers = Seq(
+        auth.select(explode(array(array($"srcUser", $"srcComputer"), array($"dstUser", $"dstComputer"))).as("compUser")),
+        proc.select(array($"user", $"computer").as("compUser")),
+        red.select(array($"user", $"srcComputer").as("compUser")),
+      )
+        .reduce(_.unionByName(_))
+        .select($"compUser"(0).as("user"), $"compUser"(1).as("computer"))
+        .distinct()
+        .call(addBlankId(Seq("user", "computer")))
+        .cache()
+
+      // write computer users
+      computerUsers
+        .call(mapIdToBlankId("user", "userId", userMapping))
+        .call(mapIdToBlankId("computer", "computerId", computerMapping))
+        .as[ComputerUser]
+        .flatMap { computerUser =>
+          val computerUserId = blank("cu", computerUser.blankId)
+          Seq(
+            Some(Triple(computerUserId, predicate(isType), literal(Types.ComputerUser))),
+            Some(Triple(computerUserId, predicate(user), blank("user", computerUser.userId))),
+            Some(Triple(computerUserId, predicate(computer), blank("comp", computerUser.computerId))),
+          ).flatten
+        }
+        .call(writeRdf(s"$outputPath/computerUsers.rdf", compressRdf))
+
+      val computerUserMapping = computerUsers.select($"user", $"computer", $"blankId").as[(String, String, Long)].cache
+      computerUserMapping.count()  // materialize computer user mapping
+      users.unpersist()    // unpersist users dataset
+      computers.unpersist()    // unpersist computer dataset
+      computerUsers.unpersist()    // unpersist computer dataset
+
+      (userMapping, computerMapping, computerUserMapping)
     }
 
     // turn Auth into AuthEvent
     val authEvents =
       auth
-        .call(mapIdToBlankId("srcUser", "srcUserId", userMapping))
-        .call(mapIdToBlankId("dstUser", "dstUserId", userMapping))
-        .call(mapIdToBlankId("srcComputer", "srcComputerId", computerMapping))
-        .call(mapIdToBlankId("dstComputer", "dstComputerId", computerMapping))
+        .call(mapUserAndComputerToBlankId("srcUser", "srcComputer", "srcComputerUserId", computerUserMapping))
+        .call(mapUserAndComputerToBlankId("dstUser", "dstComputer", "dstComputerUserId", computerUserMapping))
         .when(deduplicateAuth).call(addOccurrences)
         .when(!deduplicateAuth).call(addNoOccurrences)
         .call(addId)
@@ -209,8 +251,7 @@ object CsrDgraphSparkApp {
     // turn Proc into ProcessEvent
     val processEvent =
       proc
-        .call(mapIdToBlankId("user", "userId", userMapping))
-        .call(mapIdToBlankId("computer", "computerId", computerMapping))
+        .call(mapUserAndComputerToBlankId("computerUserId", computerUserMapping))
         .when(deduplicateProc).call(addOccurrences)
         .when(!deduplicateProc).call(addNoOccurrences)
         .call(addId)
@@ -229,8 +270,7 @@ object CsrDgraphSparkApp {
     // turn Red into CompromiseEvent
     val compromiseEvent =
       red
-        .call(mapIdToBlankId("user", "userId", userMapping))
-        .call(mapIdToBlankId("srcComputer", "srcComputerId", computerMapping))
+        .call(mapUserAndComputerToBlankId("user", "srcComputer", "computerUserId", computerUserMapping))
         .call(mapIdToBlankId("dstComputer", "dstComputerId", computerMapping))
         .when(deduplicateRed).call(addOccurrences)
         .when(!deduplicateRed).call(addNoOccurrences)
@@ -255,10 +295,8 @@ object CsrDgraphSparkApp {
         val eventId = blank("auth", event.blankId)
         Seq(
           Some(Triple(eventId, predicate(isType), literal(Types.AuthEvent))),
-          Some(Triple(eventId, predicate(sourceUser), blank("user", event.srcUserId))),
-          Some(Triple(eventId, predicate(destinationUser), blank("user", event.dstUserId))),
-          Some(Triple(eventId, predicate(sourceComputer), blank("comp", event.srcComputerId))),
-          Some(Triple(eventId, predicate(destinationComputer), blank("comp", event.dstComputerId))),
+          Some(Triple(eventId, predicate(sourceComputerUser), blank("cu", event.srcComputerUserId))),
+          Some(Triple(eventId, predicate(destinationComputerUser), blank("cu", event.dstComputerUserId))),
           event.authType.map(v => Triple(eventId, predicate(authType), literal(v, stringType))),
           event.logonType.map(v => Triple(eventId, predicate(logonType), literal(v, stringType))),
           event.authOrient.map(v => Triple(eventId, predicate(authOrient), literal(v, stringType))),
@@ -274,8 +312,7 @@ object CsrDgraphSparkApp {
         val eventId = blank("proc", event.blankId)
         Seq(
           Some(Triple(eventId, predicate(isType), literal(Types.ProcessEvent))),
-          Some(Triple(eventId, predicate(user), blank("user", event.userId))),
-          Some(Triple(eventId, predicate(computer), blank("comp", event.computerId))),
+          Some(Triple(eventId, predicate(computerUser), blank("cu", event.computerUserId))),
           Some(Triple(eventId, predicate(processName), literal(event.processName, stringType))),
           Some(Triple(eventId, predicate(eventType), literal(event.eventType, stringType))),
           Some(Triple(eventId, predicate(time), timeLiteral(event.time))),
@@ -302,8 +339,7 @@ object CsrDgraphSparkApp {
         val eventId = blank("red", event.blankId)
         Seq(
           Some(Triple(eventId, predicate(isType), literal(Types.CompromiseEvent))),
-          Some(Triple(eventId, predicate(user), blank("user", event.userId))),
-          Some(Triple(eventId, predicate(sourceComputer), blank("comp", event.srcComputerId))),
+          Some(Triple(eventId, predicate(computerUser), blank("cu", event.computerUserId))),
           Some(Triple(eventId, predicate(destinationComputer), blank("comp", event.dstComputerId))),
           Some(Triple(eventId, predicate(time), timeLiteral(event.time))),
           event.occurrences.map(v => Triple(eventId, predicate(occurrences), literal(v, integerType))),
@@ -341,7 +377,7 @@ object CsrDgraphSparkApp {
     val fields = counts.schema.fields.map(_.name)
     val values = counts.getValuesMap[Long](fields)
     val nulls = values.flatMap { case (c, v) => if (v > 0) Some(f"$v%,d ($c)") else None }.mkString(" ")
-    if (nulls.isEmpty) "None" else nulls
+    if (nulls.isEmpty) "none" else nulls
   }
 
   def countColumns[T](condition: Column => Column, dataset: Dataset[T]): DataFrame = {
@@ -385,20 +421,44 @@ object CsrDgraphSparkApp {
       .drop("split")
   }
 
-  def addBlankId[T](dataset: Dataset[T]): DataFrame =
-    dataset.withColumn("blankId", row_number() over Window.partitionBy().orderBy("id"))
+  def addBlankId[T](order: Seq[String] = Seq("id"))(dataset: Dataset[T]): DataFrame =
+    dataset.withColumn("blankId", row_number() over Window.partitionBy().orderBy(order.map(col): _*))
 
   def addId[T](dataset: Dataset[T]): DataFrame =
     dataset.withColumn("blankId", monotonically_increasing_id())
 
-  def mapIdToBlankId[T](idColumnName: String, mappedIdColumnName: String, mapping: Dataset[(String, Long)])
+  def mapIdToBlankId[T](identifierColumnName: String, idColumnName: String, mapping: Dataset[(String, Long)])
                        (dataset: Dataset[T]): DataFrame = {
     dataset
       .join(
-        mapping.withColumnRenamed("blankId", mappedIdColumnName),
-        col(idColumnName) === col("id")
+        mapping.withColumnRenamed("blankId", idColumnName),
+        col(identifierColumnName) === col("id"),
+        "left"
       )
-      .drop(idColumnName, "id")
+      .drop(identifierColumnName, "id")
+  }
+
+  def mapUserAndComputerToBlankId[T](idColumnName: String, mapping: Dataset[(String, String, Long)])
+                                    (dataset: Dataset[T]): DataFrame = {
+    dataset
+      .join(
+        mapping.withColumnRenamed("blankId", idColumnName),
+        Seq("user", "computer"),
+        "left"
+      )
+      .drop("user", "computer")
+  }
+
+  def mapUserAndComputerToBlankId[T](userIdentifierColumnName: String, computerIdentifierColumnName: String,
+                                     idColumnName: String, mapping: Dataset[(String, String, Long)])
+                                    (dataset: Dataset[T]): DataFrame = {
+    dataset
+      .join(
+        mapping.withColumnRenamed("blankId", idColumnName),
+        dataset(userIdentifierColumnName) === mapping("user") && dataset(computerIdentifierColumnName) === mapping("computer"),
+        "left"
+      )
+      .drop(userIdentifierColumnName, computerIdentifierColumnName, "user", "computer")
   }
 
   def writeRdf(path: String, compressed: Boolean)(triples: Dataset[Triple]): Unit = {

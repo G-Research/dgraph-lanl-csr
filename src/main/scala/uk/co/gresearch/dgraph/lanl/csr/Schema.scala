@@ -5,6 +5,7 @@ object Schema {
   object Types {
     val User = "User"
     val Computer = "Computer"
+    val ComputerUser = "ComputerUser"
 
     val AuthEvent = "AuthEvent"
     val ProcessEvent = "ProcessEvent"
@@ -26,13 +27,15 @@ object Schema {
     val occurrences = "occurrences"
 
     val user = "user"
-    val sourceUser = "sourceUser"
-    val destinationUser = "destinationUser"
 
     val computer = "computer"
     val sourceComputer = "sourceComputer"
     val destinationComputer = "destinationComputer"
     val resolvedComputer = "resolvedComputer"
+
+    val computerUser = "computerUser"
+    val sourceComputerUser = "sourceComputerUser"
+    val destinationComputerUser = "destinationComputerUser"
 
     val login = "login"
     val domain = "domain"

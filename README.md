@@ -11,6 +11,27 @@ This comprises the following steps:
 - Spin-up Dgraph cluster
 - Example queries for Dgraph
 
+## Statistics
+
+The dataset and the derived graph have the following properties:
+
+|Table           |Rows         |Node Type        |Predicates|Instances    |Triples      |
+|:--------------:|:-----------:|:---------------:|:--------:|:-----------:|:-----------:|
+|*all files*     |             |`User`           |3         |      400,648|             |
+|*all files*     |             |`Computer`       |1         |       35,368|             |
+|*all files*     |             |`ComputerUser`   |0         |             |             |
+|`auth.txt.gz`   |1,051,430,459|`AuthEvent`      |6         |1,051,430,459|9,783,703,732|
+|`proc.txt.gz`   |  426,045,096|`ProcessEvent`   |4         |  426,045,096|2,556,270,576|
+|`flow.txt.gz`   |  129,977,412|`FlowDuration`   |9         |  107,968,032|1,048,963,354|
+|`dns.txt.gz`    |   40,821,591|`DnsEvent`       |2         |   40,821,591|  163,286,364|
+|`redteam.txt.gz`|          749|`CompromiseEvent`|2         |          715|        3,587|
+|**sum**         |1,648,275,307|                 |          |             |             |
+
+The dataset contains some null values for four columns only:
+authentication type (55%) and logon type (14%) in `auth.txt.gz` as well as
+source (71%) and destination port (64%) in `flow.txt.gz`.
+All other columns have values in all rows.
+
 ## Download dataset
 
 First, download the dataset from https://csr.lanl.gov/data/cyber1/.
@@ -56,7 +77,30 @@ After bulk loading the RDF files into `bulk/out/0` we can serve that graph by ru
 
 ## Querying Dgraph
 
-TDB
+Ten users (`User`), their logins (`ComputerLogin`) and destinations of `AuthEvent`s from those logins:
+
+    {
+      user(func: eq(<dgraph.type>, "User"), first: 10) {
+        uid
+        id
+        login
+        domain
+        logins: ~user {
+          uid
+          computer { uid id }
+          logsOnto: ~sourceComputerUser @filter(eq(<dgraph.type>, "AuthEvent")) {
+            destinationComputerUser {
+              uid
+              computer { uid id }
+              user { uid id }
+            }
+          }
+        }
+      }
+    }
+
+![...](dgraph-ratel-query-graph.png)
+
 
 ## Fine-tuning
 

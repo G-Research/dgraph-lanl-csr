@@ -10,13 +10,15 @@
 <occurrences>: int @index(int) .
 
 <user>: uid @reverse .
-<sourceUser>: uid @reverse .
-<destinationUser>: uid @reverse .
 
 <computer>: uid @reverse .
 <sourceComputer>: uid @reverse .
 <destinationComputer>: uid @reverse .
 <resolvedComputer>: uid @reverse .
+
+<computerUser>: uid @reverse .
+<sourceComputerUser>: uid @reverse .
+<destinationComputerUser>: uid @reverse .
 
 <login>: string @index(exact) .
 <domain>: string @index(exact) .
@@ -46,11 +48,14 @@ type Computer {
   <id>
 }
 
+type ComputerUser {
+  <user>
+  <computer>
+}
+
 type AuthEvent {
-  <sourceUser>
-  <destinationUser>
-  <sourceComputer>
-  <destinationComputer>
+  <sourceComputerUser>
+  <destinationComputerUser>
   <authType>
   <logonType>
   <authOrient>
@@ -59,8 +64,7 @@ type AuthEvent {
   <occurrences>
 }
 type ProcessEvent {
-  <user>
-  <computer>
+  <computerUser>
   <processName>
   <eventType>
   <time>
@@ -73,16 +77,14 @@ type DnsEvent {
   <occurrences>
 }
 type CompromiseEvent {
-  <user>
-  <sourceComputer>
+  <computerUser>
   <destinationComputer>
   <time>
   <occurrences>
 }
 
 type ProcessDuration {
-  <user>
-  <computer>
+  <computerUser>
   <processName>
   <start>
   <end>
