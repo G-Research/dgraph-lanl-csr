@@ -11,6 +11,14 @@ This comprises the following steps:
 - [Spin-up Dgraph cluster](#serve-the-graph)
 - [Example queries for Dgraph](#querying-dgraph)
 
+The graph has the following schema.
+
+![...](schema.png)
+
+The graph model mimics the original dataset model as much as possible and adds the `User`, `Computer`
+and `ComputerUser` entities. Those have no `time` property, in contrast to the dataset entities that
+have either `time` (event types) or `start`, `end` and `duration` (duration types) properties.
+
 ## Statistics
 
 The dataset and the derived graph have the following properties:
