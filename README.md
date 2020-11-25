@@ -8,26 +8,27 @@ This comprises the following steps:
 - [Download dataset](#download-dataset)
 - [Transform the dataset into RDF](#transform-the-dataset-into-rdf)
 - [Bulk-load the RDF into Dgraph](#loading-rdf-into-dgraph)
-- Spin-up Dgraph cluster
-- Example queries for Dgraph
+- [Spin-up Dgraph cluster](#serve-the-graph)
+- [Example queries for Dgraph](#querying-dgraph)
 
 ## Statistics
 
 The dataset and the derived graph have the following properties:
 
-|Table           |Rows         |Node Type        |Predicates|Instances    |Triples      |
-|:--------------:|:-----------:|:---------------:|:--------:|:-----------:|:-----------:|
-|*all files*     |             |`User`           |3         |      400,648|             |
-|*all files*     |             |`Computer`       |1         |       35,368|             |
-|*all files*     |             |`ComputerUser`   |0         |             |             |
-|`auth.txt.gz`   |1,051,430,459|`AuthEvent`      |6         |1,051,430,459|9,783,703,732|
-|`proc.txt.gz`   |  426,045,096|`ProcessEvent`   |4         |  426,045,096|2,556,270,576|
-|`flow.txt.gz`   |  129,977,412|`FlowDuration`   |9         |  107,968,032|1,048,963,354|
-|`dns.txt.gz`    |   40,821,591|`DnsEvent`       |2         |   40,821,591|  163,286,364|
-|`redteam.txt.gz`|          749|`CompromiseEvent`|2         |          715|        3,587|
-|**sum**         |1,648,275,307|                 |          |             |             |
+|Table           |Rows         |Node Type        |Properties<br/>/ Edges|Nodes        |Triples       |
+|:--------------:|:-----------:|:---------------:|:--------------------:|:-----------:|:------------:|
+|*all files*     |             |`User`           | 3 / 0                |      100,162|       400,648|
+|*all files*     |             |`Computer`       | 1 / 0                |       17,684|        35,368|
+|*all files*     |             |`ComputerUser`   | 0 / 2                |      900,983|     2,702,949|
+|`auth.txt.gz`   |1,051,430,459|`AuthEvent`      | 6 / 2                |1,051,430,459| 7,680,842,814|
+|`proc.txt.gz`   |  426,045,096|`ProcessEvent`   | 4 / 1                |  426,045,096| 2,130,225,480|
+|`flow.txt.gz`   |  129,977,412|`FlowDuration`   | 9 / 2                |  107,968,032| 1,048,963,354|
+|`dns.txt.gz`    |   40,821,591|`DnsEvent`       | 2 / 2                |   40,821,591|   163,286,364|
+|`redteam.txt.gz`|          749|`CompromiseEvent`| 2 / 2                |          715|         2,872|
+|||||||
+|**sum**         |1,648,275,307|                 |27 / 11               |1,627,284,722|11,026,459,849|
 
-The dataset contains some null values for four columns only:
+The dataset contains some null values in four columns:
 authentication type (55%) and logon type (14%) in `auth.txt.gz` as well as
 source (71%) and destination port (64%) in `flow.txt.gz`.
 All other columns have values in all rows.
@@ -56,7 +57,7 @@ Or via Spark submit on your Spark cluster:
     spark-submit --master "…" --class uk.co.gresearch.dgraph.lanl.csr.CsrDgraphSparkApp \
         target/dgraph-lanl-csr-1.0-SNAPSHOT.jar data/ rdf/
 
-The application takes 3 hours on 8 CPUs with 4 GB RAM and 100 GB SSD disk.
+The application takes without caching 3 hours on 8 CPUs with 4 GB RAM and 100 GB SSD disk.
 On a cluster with more CPUs the time reduces proportionally.
 
 Running the Spark job with more than 64 GB memory available for caching (Spark storage)
@@ -70,6 +71,8 @@ Load the RDF files by running
     ./dgraph.bulk.sh $(pwd)/rdf $(pwd)/bulk /data/dgraph.schema.rdf "/data/*.rdf/*.txt.gz"
 
 The `dgraph.schema.rdf` schema file defines all predicates and types and adds indices to all predicates.
+
+## Serve the graph
 
 After bulk loading the RDF files into `bulk/out/0` we can serve that graph by running
 

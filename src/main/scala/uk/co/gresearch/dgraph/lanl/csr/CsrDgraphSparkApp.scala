@@ -369,7 +369,6 @@ object CsrDgraphSparkApp {
     println()
     val seconds = (System.nanoTime() - startTime) / 1000000000
     println(s"Finished in ${seconds / 3600}h ${seconds / 60 % 60}m ${seconds % 60}s")
-    Console.readLine()
   }
 
   def countNulls[T](dataset: Dataset[T]): String = {
@@ -431,9 +430,8 @@ object CsrDgraphSparkApp {
                        (dataset: Dataset[T]): DataFrame = {
     dataset
       .join(
-        mapping.withColumnRenamed("blankId", idColumnName),
-        col(identifierColumnName) === col("id"),
-        "left"
+        broadcast(mapping.withColumnRenamed("blankId", idColumnName)),
+        col(identifierColumnName) === col("id")
       )
       .drop(identifierColumnName, "id")
   }
@@ -442,9 +440,8 @@ object CsrDgraphSparkApp {
                                     (dataset: Dataset[T]): DataFrame = {
     dataset
       .join(
-        mapping.withColumnRenamed("blankId", idColumnName),
-        Seq("user", "computer"),
-        "left"
+        broadcast(mapping.withColumnRenamed("blankId", idColumnName)),
+        Seq("user", "computer")
       )
       .drop("user", "computer")
   }
@@ -454,9 +451,8 @@ object CsrDgraphSparkApp {
                                     (dataset: Dataset[T]): DataFrame = {
     dataset
       .join(
-        mapping.withColumnRenamed("blankId", idColumnName),
-        dataset(userIdentifierColumnName) === mapping("user") && dataset(computerIdentifierColumnName) === mapping("computer"),
-        "left"
+        broadcast(mapping.withColumnRenamed("blankId", idColumnName)),
+        dataset(userIdentifierColumnName) === mapping("user") && dataset(computerIdentifierColumnName) === mapping("computer")
       )
       .drop(userIdentifierColumnName, computerIdentifierColumnName, "user", "computer")
   }
