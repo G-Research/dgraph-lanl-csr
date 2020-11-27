@@ -1,5 +1,7 @@
 package uk.co.gresearch.dgraph.lanl.csr
 
+import java.nio.file.{Files, Paths}
+
 import org.apache.spark.sql._
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
@@ -32,6 +34,9 @@ case class FlowDuration(blankId: Long, srcComputerId: Long, dstComputerId: Long,
 case class Triple(s: String, p: String, o: String)
 
 object CsrDgraphSparkApp {
+
+  // convert the input files to parquet, so that subsequent runs are faster
+  val doParquet = true
 
   // user ids are split on this pattern to extract login and domain
   val userIdSplitPattern = "@"
@@ -66,8 +71,40 @@ object CsrDgraphSparkApp {
   val noType: Option[String] = None
 
   // read an input table file
-  def read[T](path: String)(implicit spark: SparkSession, encoder: Encoder[T]): Dataset[T] =
-    spark.read.option("nullValue", "?").schema(encoder.schema).csv(path).as[T](encoder)
+  def read[T](path: String)(implicit spark: SparkSession, encoder: Encoder[T]): Dataset[T] = {
+    val parquetFile = s"$path.parquet"
+
+    // if there is a txt file, turn it into a parquet file if doParquet=true
+    val txt: Option[DataFrame] =
+      if (Files.exists(Paths.get(path))) {
+        val txt =
+          spark
+            .read
+            .option("nullValue", "?")
+            .schema(encoder.schema)
+            .csv(path)
+
+        if (doParquet && !Files.exists(Paths.get(parquetFile))) {
+          txt.write.parquet(parquetFile)
+        }
+
+        Some(txt)
+      } else {
+        None
+      }
+
+    // load the table from .txt.parquet if it exists, otherwise take the .txt file
+    val df =
+      if (Files.exists(Paths.get(parquetFile)))
+        Some(spark.read.parquet(parquetFile))
+      else
+       txt
+
+    // complain if neither .txt and .txt.parquet exist
+    df.getOrElse(throw new RuntimeException(s"Neither .txt nor .txt.parquet file found in $path"))
+      .as[T](encoder)
+      .when(doCache).call(_.cache())
+  }
 
   def main(args: Array[String]): Unit = {
     println("This tool models the LANL CSR dataset as a graph and writes it")
@@ -96,11 +133,11 @@ object CsrDgraphSparkApp {
         .getOrCreate()
     import spark.implicits._
 
-    val auth = read[Auth](s"$inputPath/auth.txt").when(doCache).call(_.cache())
-    val proc = read[Proc](s"$inputPath/proc.txt").when(doCache).call(_.cache())
-    val flow = read[Flow](s"$inputPath/flows.txt").when(doCache).call(_.cache())
-    val dns = read[Dns](s"$inputPath/dns.txt").when(doCache).call(_.cache())
-    val red = read[Red](s"$inputPath/redteam.txt").when(doCache).call(_.cache())
+    val auth = read[Auth](s"$inputPath/auth.txt")
+    val proc = read[Proc](s"$inputPath/proc.txt")
+    val flow = read[Flow](s"$inputPath/flows.txt")
+    val dns = read[Dns](s"$inputPath/dns.txt")
+    val red = read[Red](s"$inputPath/redteam.txt")
 
     val (authCount, procCount, flowCount, dnsCount, redCount) = if (doStatistics) {
       (auth.count, proc.count, flow.count, dns.count, red.count)
