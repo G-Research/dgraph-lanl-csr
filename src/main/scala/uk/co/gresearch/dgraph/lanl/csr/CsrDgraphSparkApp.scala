@@ -130,6 +130,7 @@ object CsrDgraphSparkApp {
         .config("spark.local.dir", "tmp")
         .config("spark.sql.adaptive.enabled", "true")
         .config("spark.ui.showConsoleProgress", "false")
+        .config("spark.sql.broadcastTimeout", "3600")
         .getOrCreate()
     import spark.implicits._
 
