@@ -127,7 +127,7 @@ object CsrDgraphSparkApp {
       SparkSession
         .builder()
         .appName("Dgraph LANL CSR Spark App")
-        .config("spark.local.dir", ".")
+        .config("spark.local.dir", "tmp")
         .config("spark.sql.adaptive.enabled", "true")
         .config("spark.ui.showConsoleProgress", "false")
         .getOrCreate()
