@@ -34,4 +34,4 @@ sleep 10
 # start bulk loader
 echo "bulk loading"
 rm -rf /dgraph/out /dgraph/xidmap
-dgraph bulk --store_xids --xidmap /dgraph/xidmap -j 4 --ignore_errors --tmp /tmp/dgraph -f "$(join , $(ls $data_dir/*))" -s "$schema_file" --format=rdf --out=/dgraph/out --replace_out 2>&1 | tee /dgraph/bulk.log
+dgraph bulk -j 4 --ignore_errors --tmp /tmp/dgraph -f "$(join , $(ls $data_dir/*))" -s "$schema_file" --format=rdf --out=/dgraph/out --replace_out 2>&1 | tee /dgraph/bulk.log
