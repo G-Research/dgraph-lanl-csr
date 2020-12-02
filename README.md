@@ -65,11 +65,8 @@ Or via Spark submit on your Spark cluster:
     spark-submit --master "…" --class uk.co.gresearch.dgraph.lanl.csr.CsrDgraphSparkApp \
         target/dgraph-lanl-csr-1.0-SNAPSHOT.jar data/ rdf/
 
-The application takes without caching 3 hours on 8 CPUs with 4 GB RAM and 100 GB SSD disk.
+The application takes 3 hours on 8 CPUs with 4 GB RAM and 100 GB SSD disk.
 On a cluster with more CPUs the time reduces proportionally.
-
-Running the Spark job with more than 64 GB memory available for caching (Spark storage)
-can see some performance benefits from setting `val doCache = true` in `CsrDgraphSparkApp.scala`.
 
 ## Loading RDF into Dgraph
 
@@ -127,12 +124,6 @@ You should run this at least once to see if assumption of the code hold for the 
 
     // prints statistics of the dataset, this is expensive so only really needed once
     val doStatistics = false
-
-Cache the input files improves the performance of the Spark application but requires 64 GB of Spark storage memory.
-
-    // caching the input files improves performance, but requires a lot of RAM
-    // should only be done when running on a Spark cluster with sufficient memory (64GB mem storage)
-    val doCache = false
 
 The RDF files will be a multiple in size of the input files. Compressing them saves disk space at the extra cost of CPU.
 

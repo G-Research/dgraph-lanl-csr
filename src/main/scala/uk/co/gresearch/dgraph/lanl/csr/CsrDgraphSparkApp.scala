@@ -35,7 +35,8 @@ case class Triple(s: String, p: String, o: String)
 
 object CsrDgraphSparkApp {
 
-  // convert the input files to parquet, so that subsequent runs are faster
+  // convert the input files to parquet on the first run, original .txt files can be deleted then
+  // parquet is compressed but can be read in a scalable way, other than original .txt.gz files
   val doParquet = true
 
   // user ids are split on this pattern to extract login and domain
@@ -43,10 +44,6 @@ object CsrDgraphSparkApp {
 
   // prints statistics of the dataset, this is expensive so only really needed once
   val doStatistics = false
-
-  // caching the input files improves performance, but requires a lot of RAM
-  // should only be done when running on a Spark cluster with sufficient memory (64GB mem storage)
-  val doCache = false
 
   // written RDF files will be compressed if true
   val compressRdf = true
@@ -96,14 +93,13 @@ object CsrDgraphSparkApp {
     // load the table from .txt.parquet if it exists, otherwise take the .txt file
     val df =
       if (Files.exists(Paths.get(parquetFile)))
-        Some(spark.read.parquet(parquetFile))
+        Some(spark.read.schema(encoder.schema).parquet(parquetFile))
       else
        txt
 
     // complain if neither .txt and .txt.parquet exist
     df.getOrElse(throw new RuntimeException(s"Neither .txt nor .txt.parquet file found in $path"))
       .as[T](encoder)
-      .when(doCache).call(_.cache())
   }
 
   def main(args: Array[String]): Unit = {
