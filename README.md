@@ -72,8 +72,9 @@ On a cluster with more CPUs the time reduces proportionally.
 
 Load the RDF files by running
 
+    mkdir -p bulk tmp
     cp dgraph.schema.rdf rdf/
-    ./dgraph.bulk.sh $(pwd)/rdf $(pwd)/bulk /data/dgraph.schema.rdf "/data/*.rdf/*.txt.gz"
+    ./dgraph.bulk.sh $(pwd)/rdf $(pwd)/bulk $(pwd)/tmp /data/dgraph.schema.rdf "/data/*.rdf/*.txt.gz"
 
 The `dgraph.schema.rdf` schema file defines all predicates and types and adds indices to all predicates.
 
