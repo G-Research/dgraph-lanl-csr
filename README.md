@@ -36,12 +36,17 @@ The dataset and the derived graph have the following properties:
 |||||||
 |**sum**         |1,648,275,307|                 |27 / 11               |1,627,284,722|11,026,459,849|
 
+The dataset requires 11 GB (`.txt.gz`) / 89 GB (`.txt`) / 11 GB (`.parquet`) disk space.
+The RDF version is 41 GB in size (`.gz`), Dgraph requires 191 GB disk space to store the data.
+
 The dataset contains some null values in four columns:
 authentication type (55%) and logon type (14%) in `auth.txt.gz` as well as
 source (71%) and destination port (64%) in `flow.txt.gz`.
 All other columns have values in all rows.
 
-The RDF version is 41 GB in size (.gz), loading the dataset into Dgraph requires 191 GB disk space.
+Two tables have duplicate rows: `flow.txt.gz` has 6,569,939 and `redteam.txt.gz` has 12 duplicates.
+These get de-duplicated and respective nodes provide the number of duplicates in the `occurrences`
+property.
 
 ## Download dataset
 
@@ -59,9 +64,14 @@ Use appropriate paths accessible to the Spark workers if you run on a Spark clus
 Run the Spark application locally on your machine with
 
     MAVEN_OPTS=-Xmx2g mvn test-compile exec:java -Dexec.classpathScope="test" -Dexec.cleanupDaemonThreads=false \
-        -Dexec.mainClass="uk.co.gresearch.dgraph.lanl.csr.RunSparkApp" -Dexec.args="data/ rdf/"
+        -Dexec.mainClass="uk.co.gresearch.dgraph.lanl.csr.RunSparkApp" -Dexec.args="data rdf"
 
-Or via Spark submit on your Spark cluster:
+You may want to the Spark application not to use `/tmp` for its temporary files but a different path.
+Use `SPARK_LOCAL_DIRS` for that:
+
+    SPARK_LOCAL_DIRS=$(pwd)/tmp MAVEN_OPTS=-Xmx2g mvn …
+
+Run the application via Spark submit on your Spark cluster:
 
     mvn package
     spark-submit --master "…" --class uk.co.gresearch.dgraph.lanl.csr.CsrDgraphSparkApp \
@@ -76,15 +86,18 @@ Load the RDF files by running
 
     mkdir -p bulk tmp
     cp dgraph.schema.rdf rdf/
-    ./dgraph.bulk.sh $(pwd)/rdf $(pwd)/bulk $(pwd)/tmp /data/dgraph.schema.rdf "/data/*.rdf/*.txt.gz"
+    ./dgraph.bulk.sh rdf bulk tmp /data/dgraph.schema.rdf "/data/*.rdf/*.txt.gz"
 
 The `dgraph.schema.rdf` schema file defines all predicates and types and adds indices to all predicates.
+
+The Dgraph bulk loader requires up to 32 GB of RAM and 200 GB of disk space.
+Loading the graph with 16 CPUs, 32 GB RAM, 200 GB temporary disk space and SSD disks takes 16 hours.
 
 ## Serve the graph
 
 After bulk loading the RDF files into `bulk/out/0` we can serve that graph by running
 
-    ./dgraph.serve.sh $(pwd)/bulk
+    ./dgraph.serve.sh bulk
 
 ## Querying Dgraph
 
@@ -117,6 +130,13 @@ Ten users (`User`), their logins (`ComputerLogin`) and destinations of `AuthEven
 
 The Spark application `CsrDgraphSparkApp` lets you customize the RDF generation part of this pipeline.
 
+The input files are not particularly Spark-friendly. With `doParquet = true` they will be converted into
+Parquet files on the first run and used from then on. The originial `.txt` files can then be deleted.
+
+    // convert the input files to parquet on the first run, original .txt files can be deleted then
+    // parquet is compressed but can be read in a scalable way, other than original .txt.gz files
+    val doParquet = true
+
 User ids are split on the `@` characters. If your dataset uses a different separator between login and domain, set this here:
 
     // user ids are split on this pattern to extract login and domain
@@ -126,6 +146,7 @@ The Spark application prints some statistics of the dataset. Computing these is 
 You should run this at least once to see if assumption of the code hold for the particular dataset.
 
     // prints statistics of the dataset, this is expensive so only really needed once
+    // this is particularly faster with parquet input files (see doParquet)
     val doStatistics = false
 
 The RDF files will be a multiple in size of the input files. Compressing them saves disk space at the extra cost of CPU.

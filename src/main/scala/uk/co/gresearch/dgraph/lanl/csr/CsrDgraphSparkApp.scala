@@ -42,7 +42,8 @@ object CsrDgraphSparkApp {
   // user ids are split on this pattern to extract login and domain
   val userIdSplitPattern = "@"
 
-  // prints statistics of the dataset, this is expensive so only really needed once
+  // prints statistics of the dataset, this is expensive and only really needed once
+  // this is particularly faster with parquet input files (see doParquet)
   val doStatistics = false
 
   // written RDF files will be compressed if true
