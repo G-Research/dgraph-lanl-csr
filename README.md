@@ -41,6 +41,8 @@ authentication type (55%) and logon type (14%) in `auth.txt.gz` as well as
 source (71%) and destination port (64%) in `flow.txt.gz`.
 All other columns have values in all rows.
 
+The RDF version is 41 GB in size (.gz), loading the dataset into Dgraph requires 191 GB disk space.
+
 ## Download dataset
 
 First, download the dataset from https://csr.lanl.gov/data/cyber1/.
