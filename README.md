@@ -3,7 +3,9 @@
 This project helps to load the ["Comprehensive, Multi-Source Cyber-Security Events"](https://csr.lanl.gov/data/cyber1/) dataset published
 by [Advanced Research in Cyber Systems](https://csr.lanl.gov/) into a [Dgraph cluster](https://dgraph.io/docs/get-started#dgraph).
 
-This comprises the following steps:
+A detailed introduction into the Spark code that performs the pre-processing can be found in [SPARK.md](SPARK.md).
+
+The pre-processing comprises the following steps:
 
 - [Download dataset](#download-dataset)
 - [Transform the dataset into RDF](#transform-the-dataset-into-rdf)
@@ -11,7 +13,7 @@ This comprises the following steps:
 - [Spin-up Dgraph cluster](#serve-the-graph)
 - [Example queries for Dgraph](#querying-dgraph)
 
-The graph has the following schema.
+The graph has the following schema:
 
 ![...](schema.png)
 

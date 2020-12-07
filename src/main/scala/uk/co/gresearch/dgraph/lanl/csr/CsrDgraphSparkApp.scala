@@ -437,7 +437,7 @@ object CsrDgraphSparkApp {
     dataset
       .groupBy(dataset.columns.map(col): _*)
       .agg(count(lit(1)).cast(IntegerType).as("occurrences"))
-      // only keep occurences > 1
+      // only keep occurrences > 1
       .withColumn("occurrences", when($"occurrences" > 1, $"occurrences"))
   }
 
