@@ -1,8 +1,12 @@
-# Dataset pre-processing with Spark
+# Dataset pre-processing with Apache Spark
 
 This describes how [Apache Spark](https://spark.apache.org/) is used to transform
-the ["Comprehensive, Multi-Source Cyber-Security Events"](https://csr.lanl.gov/data/cyber1/) dataset
-into RDF files that can be loaded with [Dgraph Bulk Loader](https://dgraph.io/docs/deploy/fast-data-loading/#bulk-loader).
+the 1.6 bn rows ["Comprehensive, Multi-Source Cyber-Security Events"](https://csr.lanl.gov/data/cyber1/) dataset
+into 11 bn RDF triples on a laptop in under 3 hours.
+The RDF dataset can be loaded into a Dgraph cluster
+with [Dgraph Bulk Loader](https://dgraph.io/docs/deploy/fast-data-loading/#bulk-loader).
+
+The full transformation code can be found in the [G-Research/dgraph-lanl-csr](https://github.com/G-Research/dgraph-lanl-csr/blob/master/src/main/scala/uk/co/gresearch/dgraph/lanl/csr/CsrDgraphSparkApp.scala) project.
 
 ## The dataset
 
@@ -12,14 +16,14 @@ It consists of five files:
 
 |File            |Lines        |Size  |Description|
 |:--------------:|:-----------:|:----:|:----------|
-|`auth.txt.gz`   |1,051,430,459|7.2 GB|authenticaton attempts of user from one computer to another.|
-|`proc.txt.gz`   |  426,045,096|2.2 GB|processes started on computers by users|
-|`flow.txt.gz`   |  129,977,412|1.1 GB|network traffic between computers|
-|`dns.txt.gz`    |   40,821,591|0.2 GB|DNS request sent by computers|
-|`redteam.txt.gz`|          749|0.0 GB|known events where users compromising computers|
+|`auth.txt.gz`   |1,051,430,459|7.2 GB|authentication attempts of user from one computer to another|
+|`proc.txt.gz`   |  426,045,096|2.2 GB|processes started on computers by users|
+|`flow.txt.gz`   |  129,977,412|1.1 GB|network traffic between computers|
+|`dns.txt.gz`    |   40,821,591|0.2 GB|DNS requests sent by computers|
+|`redteam.txt.gz`|          749|0.0 GB|known events where users compromising computers|
 
-The output temporal graph has 1.6 bn nodes and 11 bn triples.
-The model has 8 node types, 27 property and 11 edge types.
+The output temporal graph has 1.6 bn nodes and 11 bn triples.
+The graph model has 8 node types, 19 property and 8 edge types.
 
 ## Load the dataset
 
@@ -165,24 +169,25 @@ writerWithOption.text(path)
 
 Obviously, these helper methods make code much more readable.
 
-It is available through the [spark-extension](https://github.com/G-Research/spark-extension#using-spark-extension)
+It is available through the [G-Research/spark-extension](https://github.com/G-Research/spark-extension#using-spark-extension)
 dependency (≥1.3.0).
 
 ## Modelling the graph
 
 Each input file has its corresponding entity (node type) in the schema depicted by boxes.
 Users (`User`), computers (`Computer`) and users logged in to a particular computer (`ComputerUser`)
-are modeled as specific entities, whereas in the input dataset they are mentioned in
-the files but not explicitly defined.
+are modeled as specific entities, whereas in the input dataset they are referenced but not explicitly defined.
 
 ![...](schema.png)
 
 ## Transforming the dataset
 
+This dataset has non-temporal entities (`User`, `Computer`, `ComputerUser`) and temporal events (`AuthEvent`, `ProcessEvent`, `DnsEvent`, `CompromiseEvent`, `FlowDuration`).
+
 ### Users, computers and computer users
 
-First we generate the users, computers and computer user instances by taking all users, computers
-and user/computer co-occurrences that occur in the dataset. For instance, user ids can be found
+First we generate the users, computers and computer user instances by taking all user and computer occurrences,
+as well as all user/computer co-occurrences in the dataset. For instance, user ids can be found
 in the `srcUser` and `dstUser` property of `auth`, as well as the `user` property of `proc` and `red`.
 
 These entities have no `time` component, other than the entities that later represent the input files.
@@ -208,7 +213,7 @@ val users = Seq(
 …
 ```
 
-User ids occur multiple times across those input files, and we are only want them once in out `user`
+User ids occur multiple times across those input files, and we only want them once in our `user`
 dataset, so we `distinct` them.
 
 The `addLoginAndDomain` method splits the `id` on the `@` character and populates the `login` and `domain`
@@ -216,7 +221,7 @@ property.
 
 With `addBlankId` we add a unique id to each line.
 
-Finally, we cache `users`, `computers` and `computerUsers` because we reference these datasets multiple times
+Finally, we `cache` the `users`, `computers` and `computerUsers` datasets because we reference these datasets multiple times further down
 while they are very expensive to produce each time. These datasets are very small and easily fit into
 memory.
 
@@ -252,7 +257,7 @@ users
 .call(writeRdf(s"$outputPath/users.rdf", compressRdf))
 ```
 
-Using `case class User` and `flatMap` allows us to access the columns fully typed and compile-time checked
+Using `case class User` and `flatMap` allows us to access the columns fully typed and compile-time-checked
 through the `user` variable. We define a `Seq` of `Triple`s, which we then write into the RDF file.
 
 The RDF file looks like:
@@ -261,9 +266,10 @@ _:user1 <dgraph.type> "User" .
 _:user1 <id> "ANONYMOUS LOGON@C1065" .
 _:user1 <login> "ANONYMOUS LOGON" .
 _:user1 <domain> "C1065" .
+…
 ```
 
-From the users and computers that we have just written and cached, we define a mapping from the
+From the users and computers that we have just written and cached, we derive a mapping from the
 `id` to the generated `blankId` as:
 
 ```scala
@@ -287,7 +293,7 @@ These mappings can be cached in memory as well.
 
 Computer users link to the `blankId` of users and computers, that we have just written to RDF files,
 not the `id`s coming from the input files. So we have to apply our `userMapping` and `computerMapping`
-before writing them to RDF as well:
+before writing `computerUsers` to RDF as well:
 
 ```scala
 computerUsers
@@ -349,9 +355,9 @@ After all mappings have been defined, we can remove the `users`, `computers` and
 tables from the cache:
 
 ```scala
-users.unpersist()    // unpersist users dataset
-computers.unpersist()    // unpersist computer dataset
-computerUsers.unpersist()    // unpersist computer dataset
+users.unpersist()
+computers.unpersist()
+computerUsers.unpersist()
 ```
 
 ### Events and durations
@@ -385,8 +391,8 @@ val authEvents =
   …
 ```
 
-We only need to map user and computer ids to the respective `blankId` using our mapping datasets.
-Some input files need to be de-duplictated as some rows occur multiple times. These get the
+All we do here is mapping user and computer ids to the respective `blankId` using our mapping datasets.
+Some input files need to be de-duplicated as some rows occur multiple times. These get the
 `occurrences` property populated via `addOccurrences` with the respective number.
 
 ```scala
@@ -405,7 +411,8 @@ def addNoOccurrences[T](dataset: Dataset[T]): DataFrame = {
 ```
 
 Similar to `addBlankId`, the `addId` operation adds unique ids to each row. The former only works
-for small datasets that fit into a single partition, the latter works for arbitrary size datasets.
+for small datasets that fit into a single partition while providing strictly monotonic increasing ids,
+the latter works for arbitrary size datasets and does not have such a guarantee.
 
 ```scala
 def addBlankId[T](order: Seq[String] = Seq("id"))(dataset: Dataset[T]): DataFrame =
@@ -415,7 +422,7 @@ def addId[T](dataset: Dataset[T]): DataFrame =
   dataset.withColumn("blankId", monotonically_increasing_id())
 ```
 
-This turns `auth`
+All these steps turn `auth`
 ```scala
 scala> auth.show(5, false)
 +----+--------------------+--------------------+-----------+-----------+---------+---------+----------+-------+
@@ -467,9 +474,9 @@ authEvents
   .call(writeRdf(s"$outputPath/auth-events.rdf", compressRdf))
 ```
 
-Some triples are optional, as some properties like `authType` or `logonType` are.
+Some triples are optional, as some properties like `authType` or `logonType` can be `null`.
 
-Now we have transformed the dataset into RDF files than can be loaded by Dgraph.
+Now we have transformed the dataset into RDF files than can be loaded into Dgraph.
 For example, the `auth-events.rdf` file looks like
 
 ```text
@@ -485,8 +492,8 @@ _:auth0 <time> "1" .
 
 ## Runtime statistics
 
-This Spark application takes 2-3 hours with 8 CPUs, 4 GB JVM memory and 100 GB SSD
+This Spark application takes 2-3 hours with 8 CPUs, 4 GB JVM memory and 100 GB SSD
 to transform the entire dataset into RDF.
 
 Loading the RDF into Dgraph is a different story.
-With 16 CPUs, 32 GB RAM, 200 GB temporary disk space and 200 GB SSD disks this takes 16 hours.
+This takes 16 hours with 16 CPUs, 32 GB RAM, 200 GB temporary disk space and 200 GB SSD disks.
