@@ -7,16 +7,19 @@ into RDF files that can be loaded with [Dgraph Bulk Loader](https://dgraph.io/do
 ## The dataset
 
 The dataset published by [Advanced Research in Cyber Systems](https://csr.lanl.gov/)
-consists of five files:
+is a temporal graph that [models events between computers and users](#modelling-the-graph).
+It consists of five files:
 
-|File            |Lines        |Size  |
-|:--------------:|:-----------:|:----:|
-|`auth.txt.gz`   |1,051,430,459|7.2 GB|
-|`proc.txt.gz`   |  426,045,096|2.2 GB|
-|`flow.txt.gz`   |  129,977,412|1.1 GB|
-|`dns.txt.gz`    |   40,821,591|0.2 GB|
-|`redteam.txt.gz`|          749|0.0 GB|
+|File            |Lines        |Size  |Description|
+|:--------------:|:-----------:|:----:|:----------|
+|`auth.txt.gz`   |1,051,430,459|7.2 GB|authenticaton attempts of user from one computer to another.|
+|`proc.txt.gz`   |  426,045,096|2.2 GB|processes started on computers by users|
+|`flow.txt.gz`   |  129,977,412|1.1 GB|network traffic between computers|
+|`dns.txt.gz`    |   40,821,591|0.2 GB|DNS request sent by computers|
+|`redteam.txt.gz`|          749|0.0 GB|known events where users compromising computers|
 
+The output temporal graph has 1.6 bn nodes and 11 bn triples.
+The model has 8 node types, 27 property and 11 edge types.
 
 ## Load the dataset
 
