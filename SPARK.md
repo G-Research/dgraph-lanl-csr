@@ -135,40 +135,35 @@ def writeRdf(path: String, compressed: Boolean)(triples: Dataset[Triple]): Unit 
 }
 ```
 
-**Note:** The `when` and `call` methods are helper methods that allow us to conditionally and fluently
-call into methods that take a dataset as an argument.
-Without it, `df.when(condition).call(transform).cache` would read
-`(if (condition) transform(df) else df).cache`, where the effective sequence of operations
-is harder to grasp. This makes subsequent code much more readable.
+### Conditional and fluent transformation methods `when` and `call`
 
-It is available through the [spark-extension](https://github.com/G-Research/spark-extension#using-spark-extension)
-dependency (≥1.3.0), specifically this code:
+The `when` and `call` methods in this tutorial are helper methods that allow us to conditionally and fluently
+call into methods that take a dataset as an argument. Without it
 
 ```scala
-package object gresearch {
-
-  implicit class ExtendedTransformation[T](t: T) {
-    def when(condition: Boolean): WhenTransformation[T] =
-      if (condition) ThenTransformation(t) else OtherwiseTransformation(t)
-
-    def call[R](transformation: T => R): R = transformation(t)
-
-    trait WhenTransformation[T] {
-      def call(transformation: T => T): T
-    }
-
-    case class ThenTransformation[T](t: T) extends WhenTransformation[T] {
-      override def call(transformation: T => T): T = t.call(transformation)
-    }
-
-    case class OtherwiseTransformation[T](t: T) extends WhenTransformation[T] {
-      override def call(transformation: T => T): T = t
-    }
-  }
-
-}
+triples
+  .write
+  .when(compressed).call(_.option("compression", "gzip"))
+  .text(path)
 ```
 
+would read
+
+```scala
+val writer = triples.write
+val writerWithOption =
+  if (compressed) {
+    writer.option("compression", "gzip")
+  } else {
+    writer
+  }
+writerWithOption.text(path)
+```
+
+Obviously, these helper methods make code much more readable.
+
+It is available through the [spark-extension](https://github.com/G-Research/spark-extension#using-spark-extension)
+dependency (≥1.3.0).
 
 ## Modelling the graph
 
