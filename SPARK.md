@@ -1,7 +1,22 @@
 # Dataset pre-processing with Spark
 
 This describes how [Apache Spark](https://spark.apache.org/) is used to transform
-the originial datset into RDF files that can be loaded with [Dgraph Bulk Loader](https://dgraph.io/docs/deploy/fast-data-loading/#bulk-loader).
+the ["Comprehensive, Multi-Source Cyber-Security Events"](https://csr.lanl.gov/data/cyber1/) dataset
+into RDF files that can be loaded with [Dgraph Bulk Loader](https://dgraph.io/docs/deploy/fast-data-loading/#bulk-loader).
+
+## The dataset
+
+The dataset published by [Advanced Research in Cyber Systems](https://csr.lanl.gov/)
+consists of five files:
+
+|File            |Lines        |Size  |
+|:--------------:|:-----------:|:----:|
+|`auth.txt.gz`   |1,051,430,459|7.2 GB|
+|`proc.txt.gz`   |  426,045,096|2.2 GB|
+|`flow.txt.gz`   |  129,977,412|1.1 GB|
+|`dns.txt.gz`    |   40,821,591|0.2 GB|
+|`redteam.txt.gz`|          749|0.0 GB|
+
 
 ## Load the dataset
 
