@@ -79,7 +79,7 @@ Run the application via Spark submit on your Spark cluster:
     spark-submit --master "…" --class uk.co.gresearch.dgraph.lanl.csr.CsrDgraphSparkApp \
         target/dgraph-lanl-csr-1.0-SNAPSHOT.jar data/ rdf/
 
-The application takes 3 hours on 8 CPUs with 4 GB RAM and 100 GB SSD disk.
+The application takes 2-3 hours on 8 CPUs with 4 GB RAM and 100 GB SSD disk.
 On a cluster with more CPUs the time reduces proportionally.
 
 ## Loading RDF into Dgraph

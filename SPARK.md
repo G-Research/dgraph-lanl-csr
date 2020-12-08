@@ -121,7 +121,13 @@ def writeRdf(path: String, compressed: Boolean)(triples: Dataset[Triple]): Unit 
 ```
 
 **Note:** The `when` and `call` methods are helper methods that allow us to conditionally and fluently
-call into methods that take a dataset as an argument:
+call into methods that take a dataset as an argument.
+Without it, `df.when(condition).call(transform).cache` would read
+`(if (condition) transform(df) else df).cache`, where the effective sequence of operations
+is harder to grasp. This makes subsequent code much more readable.
+
+It is available through the [spark-extension](https://github.com/G-Research/spark-extension#using-spark-extension)
+dependency (≥1.3.0), specifically this code:
 
 ```scala
 package object gresearch {
@@ -143,15 +149,11 @@ package object gresearch {
     case class OtherwiseTransformation[T](t: T) extends WhenTransformation[T] {
       override def call(transformation: T => T): T = t
     }
-
   }
 
 }
 ```
 
-Without it, `df.when(condition).call(transform).cache` would read
-`(if (condition) transform(df) else df).cache`, where the effective sequence of operations
-is harder to grasp. This makes subsequent code much more readable.
 
 ## Modelling the graph
 
@@ -454,7 +456,8 @@ authEvents
 
 Some triples are optional, as some properties like `authType` or `logonType` are.
 
-Now we have transformed the dataset into RDF files, where the `auth-events.rdf` file looks like
+Now we have transformed the dataset into RDF files than can be loaded by Dgraph.
+For example, the `auth-events.rdf` file looks like
 
 ```text
 _:auth0 <dgraph.type> "AuthEvent" .
@@ -466,3 +469,11 @@ _:auth0 <authOrientation> "LogOn" .
 _:auth0 <outcome> "Success" .
 _:auth0 <time> "1" .
 ```
+
+## Runtime statistics
+
+This Spark application takes 2-3 hours with 8 CPUs, 4 GB JVM memory and 100 GB SSD
+to transform the entire dataset into RDF.
+
+Loading the RDF into Dgraph is a different story.
+With 16 CPUs, 32 GB RAM, 200 GB temporary disk space and 200 GB SSD disks this takes 16 hours.
