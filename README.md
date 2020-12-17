@@ -15,7 +15,7 @@ The pre-processing comprises the following steps:
 
 The graph has the following schema:
 
-![...](schema.png)
+![Graph Schema](schema.png)
 
 The graph model mimics the original dataset model as much as possible and adds the `User`, `Computer`
 and `ComputerUser` entities. Those have no `time` property, in contrast to the dataset entities that

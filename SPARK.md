@@ -8,6 +8,8 @@ with [Dgraph Bulk Loader](https://dgraph.io/docs/deploy/fast-data-loading/#bulk-
 
 The full transformation code can be found in the [G-Research/dgraph-lanl-csr](https://github.com/G-Research/dgraph-lanl-csr/blob/master/src/main/scala/uk/co/gresearch/dgraph/lanl/csr/CsrDgraphSparkApp.scala) project.
 
+You can find step-by-step instructions on how to run the Spark application in [README.md](README.md).
+
 ## The dataset
 
 The dataset published by [Advanced Research in Cyber Systems](https://csr.lanl.gov/)
@@ -178,7 +180,7 @@ Each input file has its corresponding entity (node type) in the schema depicted 
 Users (`User`), computers (`Computer`) and users logged in to a particular computer (`ComputerUser`)
 are modeled as specific entities, whereas in the input dataset they are referenced but not explicitly defined.
 
-![...](schema.png)
+![Graph Schema](schema.png)
 
 ## Transforming the dataset
 
